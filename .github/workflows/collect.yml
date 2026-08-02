@@ -20,15 +20,17 @@ jobs:
         env:
           KRX_AUTH_KEY: ${{ secrets.KRX_AUTH_KEY }}
           KRX_INDEX_ENDPOINT: ${{ vars.KRX_INDEX_ENDPOINT }}
+          KRX_INVESTOR_ENDPOINT: ${{ vars.KRX_INVESTOR_ENDPOINT }}
           MARKET_DATE: ${{ inputs.market_date }}
         run: |
           python scripts/collect_market.py
+          python scripts/collect_investor.py
           python -m unittest discover -s tests -v
       - name: Commit data
         run: |
-          if git diff --quiet -- data/market.json data/market.js; then exit 0; fi
+          if git diff --quiet -- data/market.json data/market.js data/investor_trends.json data/investor_trends.js; then exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/market.json data/market.js
+          git add data/market.json data/market.js data/investor_trends.json data/investor_trends.js
           git commit -m "data: update KOSPI market close"
           git push

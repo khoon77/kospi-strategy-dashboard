@@ -6,6 +6,8 @@
 
 저장소 `Settings > Secrets and variables > Actions`에 `KRX_AUTH_KEY` Secret을 등록합니다. 키는 코드나 로그에 저장하지 않습니다. 필요하면 `KRX_INDEX_ENDPOINT` Repository variable로 API 주소를 덮어쓸 수 있습니다.
 
+매매동향 API 상품이 승인되면 해당 URL을 `KRX_INVESTOR_ENDPOINT` Repository variable에 등록합니다. `collect.yml`은 지수와 투자자별 매매동향을 함께 수집하며, 승인 전에는 사용자 제공 CSV 데이터를 보존합니다. 실제 응답 필드가 다르면 `scripts/collect_investor.py`의 `FIELDS` 매핑만 API 명세에 맞춰 조정합니다.
+
 ## 자동화
 
 - `collect.yml`: 평일 17:20 KST에 KRX 종가를 수집하고 JSON을 누적합니다.
