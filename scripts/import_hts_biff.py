@@ -2,7 +2,7 @@ import json,struct,sys
 from datetime import datetime,timezone,timedelta
 from pathlib import Path
 
-ROOT=Path(__file__).resolve().parents[1]; OUT=ROOT/'data'/'market.json'; SEOUL=timezone(timedelta(hours=9))
+ROOT=Path(__file__).resolve().parents[1]; OUT=ROOT/'data'/'market.json'; JS_OUT=ROOT/'data'/'market.js'; SEOUL=timezone(timedelta(hours=9))
 COLS={0:'date',1:'open',2:'high',3:'low',4:'close',5:'volume',6:'trade_value',7:'open_interest'}
 
 def parse(path):
@@ -51,6 +51,6 @@ def main():
   if r['date'] in flows:
    r['foreign_spot_net']=flows[r['date']].get('foreign_spot_net');r['foreign_futures_net']=flows[r['date']].get('foreign_futures_net')
  old.update(status='live',message='사용자 제공 HTS 일봉 데이터',updated_at=datetime.now(SEOUL).isoformat(timespec='seconds'),sources={'index':f'User-provided {path.name}','foreign_spot':'not_connected','foreign_futures':'not_connected'},records=records)
- OUT.write_text(json.dumps(old,ensure_ascii=False,separators=(',',':'))+'\n',encoding='utf-8')
+ compact=json.dumps(old,ensure_ascii=False,separators=(',',':'));OUT.write_text(compact+'\n',encoding='utf-8');JS_OUT.write_text('window.MARKET_DATA='+compact+';\n',encoding='utf-8')
  print(json.dumps({'source':str(path),'rows':len(records),'first':records[0]['date'],'last':records[-1]['date'],'last_close':records[-1]['close'],'last_trade_value':records[-1]['trade_value']},ensure_ascii=False))
 if __name__=='__main__':main()

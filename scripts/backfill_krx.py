@@ -2,7 +2,7 @@ import json,os,time,urllib.parse,urllib.request
 from datetime import date,datetime,timedelta,timezone
 from pathlib import Path
 
-ROOT=Path(__file__).resolve().parents[1]; FILE=ROOT/'data'/'market.json'; SEOUL=timezone(timedelta(hours=9)); ENDPOINT=os.getenv('KRX_INDEX_ENDPOINT') or 'https://data-dbg.krx.co.kr/svc/apis/idx/kospi_dd_trd'
+ROOT=Path(__file__).resolve().parents[1]; FILE=ROOT/'data'/'market.json'; JS_FILE=ROOT/'data'/'market.js'; SEOUL=timezone(timedelta(hours=9)); ENDPOINT=os.getenv('KRX_INDEX_ENDPOINT') or 'https://data-dbg.krx.co.kr/svc/apis/idx/kospi_dd_trd'
 def number(v):
  if v in (None,'','-'):return None
  return float(str(v).replace(',',''))
@@ -13,7 +13,7 @@ def fetch(day,key):
  if not row:return None
  return {'date':day.isoformat(),'open':number(row.get('OPNPRC_IDX')),'high':number(row.get('HGPRC_IDX')),'low':number(row.get('LWPRC_IDX')),'close':number(row.get('CLSPRC_IDX')),'change_pct':number(row.get('FLUC_RT')),'trade_value':number(row.get('ACC_TRDVAL')),'foreign_spot_net':None,'foreign_futures_net':None,'source':'KRX Open API'}
 def save(data,records):
- data.update(status='live',message='KRX 2016년 이후 지수 데이터',updated_at=datetime.now(SEOUL).isoformat(timespec='seconds'),records=sorted(records.values(),key=lambda x:x['date']));FILE.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+ data.update(status='live',message='KRX 2016년 이후 지수 데이터',updated_at=datetime.now(SEOUL).isoformat(timespec='seconds'),records=sorted(records.values(),key=lambda x:x['date']));compact=json.dumps(data,ensure_ascii=False,separators=(',',':'));FILE.write_text(compact+'\n',encoding='utf-8');JS_FILE.write_text('window.MARKET_DATA='+compact+';\n',encoding='utf-8')
 def main():
  key=os.getenv('KRX_AUTH_KEY','').strip()
  if not key:raise SystemExit('KRX_AUTH_KEY is required')
