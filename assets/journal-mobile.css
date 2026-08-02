@@ -1,0 +1,4 @@
+.device-only{margin-top:10px!important;padding:9px 11px;border-radius:8px;background:#ffffff14;font-size:.76rem!important;line-height:1.45}
+.entry-images{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px!important;overflow:visible!important;margin-top:12px}
+.entry-images img{display:block;width:100%!important;height:auto!important;max-height:520px;object-fit:contain!important;border-radius:9px;background:var(--bg);cursor:zoom-in}
+@media(max-width:480px){.entry-images{grid-template-columns:1fr}}
