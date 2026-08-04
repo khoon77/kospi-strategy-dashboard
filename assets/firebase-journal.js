@@ -33,11 +33,25 @@ async function remoteEntry(snapshot) { const entry = { id: snapshot.id, ...snaps
 async function downloadCloud(snapshot) { if (syncing) return; syncing = true; try { const local = new Map((await localEntries()).map(entry => [entry.id, entry])); let changed = 0; for (const remoteDoc of snapshot.docs) { const current = local.get(remoteDoc.id), remoteUpdated = remoteDoc.data().updatedAt || ''; if (!current || remoteUpdated > (current.updatedAt || '')) { await putLocal(await remoteEntry(remoteDoc)); changed += 1; } } if (changed) refreshJournal(); status(`Firebase 연결됨 · 클라우드 ${snapshot.size}건`, 'ok'); } catch (error) { console.error(error); status(`동기화 오류: ${error.message}`, 'error'); } finally { syncing = false; } }
 async function syncAll() { if (!user || syncing) return; syncing = true; status('이 기기의 일지와 사진을 동기화하는 중…'); try { const entries = await localEntries(); for (let index = 0; index < entries.length; index += 1) { status(`동기화 중 ${index + 1}/${entries.length}`); await uploadEntry(entries[index]); } status(`동기화 완료 · ${entries.length}건`, 'ok'); } catch (error) { console.error(error); status(`동기화 오류: ${error.message}`, 'error'); alert(`Firebase 동기화에 실패했습니다.\n${error.message}`); } finally { syncing = false; } }
 async function deleteRemote(id) { if (!user || !id) return; const ref = journalRef(id), photos = await getDocs(collection(ref, 'photos')); await Promise.all(photos.docs.map(item => deleteDoc(item.ref))); await deleteDoc(ref); status('클라우드에서도 삭제했습니다.', 'ok'); }
+async function syncLatestMarket() {
+  if (!user) return;
+  const records = window.MARKET_DATA?.records || [];
+  const latest = records[records.length - 1];
+  if (!latest?.date) return;
+  const syncedAt = new Date().toISOString();
+  await setDoc(doc(db, 'users', user.uid, 'market', latest.date), { ...latest, syncedAt }, { merge: true });
+  await setDoc(doc(db, 'users', user.uid, 'system', 'marketStatus'), {
+    latestDate: latest.date,
+    source: latest.source || 'KRX Open API',
+    syncedAt,
+    recordCount: records.length
+  }, { merge: true });
+}
 async function login() { status('Google 로그인 창을 여는 중…'); try { await signInWithPopup(auth, provider); } catch (error) { if (['auth/popup-blocked', 'auth/cancelled-popup-request', 'auth/operation-not-supported-in-this-environment'].includes(error.code)) return signInWithRedirect(auth, provider); status(`로그인 실패: ${error.message}`, 'error'); } }
 
 function updateAuthUI() { const loginButton = document.getElementById('cloud-login'), syncButton = document.getElementById('cloud-sync'), logoutButton = document.getElementById('cloud-logout'); if (!loginButton) return; loginButton.hidden = Boolean(user); syncButton.hidden = !user; logoutButton.hidden = !user; if (!user) status('Google 로그인 후 모바일·PC에서 같은 일지를 볼 수 있습니다.'); else status(`${user.email} · Firebase 연결 중…`); }
 function installUI() { if (document.getElementById('firebase-journal-sync')) return true; const hero = document.querySelector('.journal-hero'); if (!hero) return false; hero.insertAdjacentHTML('afterend', '<section id="firebase-journal-sync" class="cloud-sync panel" aria-live="polite"><div><b>기기 간 일지 동기화</b><span id="cloud-status">Firebase 연결 확인 중…</span></div><div class="cloud-actions"><button id="cloud-login" type="button">Google로 로그인</button><button id="cloud-sync" type="button" hidden>이 기기 자료 동기화</button><button id="cloud-logout" type="button" hidden>로그아웃</button></div></section>'); const deviceNote = document.querySelector('.device-only'); if (deviceNote) deviceNote.innerHTML = '<b>먼저 이 기기에 안전하게 저장됩니다.</b> Google 로그인 후 Firebase 동기화를 사용하면 모바일·PC에서 함께 볼 수 있습니다.'; const storageNote = document.querySelector('.journal-storage-note'); if (storageNote) storageNote.textContent = '사진은 최대 10MB를 받아 자동 축소합니다. 로그인 상태에서는 Firebase에도 압축·분할 저장됩니다.'; const footer = document.querySelector('#journal-view footer p'); if (footer) footer.innerHTML = '<b>저장 위치:</b> 기기 내 IndexedDB + 로그인 시 개인 Firebase 공간. 기존 모바일 자료는 해당 모바일에서 로그인한 뒤 ‘이 기기 자료 동기화’를 한 번 눌러주세요.'; document.getElementById('cloud-login').onclick = login; document.getElementById('cloud-sync').onclick = syncAll; document.getElementById('cloud-logout').onclick = () => signOut(auth); updateAuthUI(); return true; }
 const uiTimer = setInterval(() => { if (installUI()) clearInterval(uiTimer); }, 100);
-onAuthStateChanged(auth, currentUser => { user = currentUser; if (stopWatching) stopWatching(); stopWatching = null; updateAuthUI(); if (user) stopWatching = onSnapshot(collection(db, 'users', user.uid, 'journals'), downloadCloud, error => status(`동기화 오류: ${error.message}`, 'error')); });
+onAuthStateChanged(auth, currentUser => { user = currentUser; if (stopWatching) stopWatching(); stopWatching = null; updateAuthUI(); if (user) { stopWatching = onSnapshot(collection(db, 'users', user.uid, 'journals'), downloadCloud, error => status(`동기화 오류: ${error.message}`, 'error')); syncLatestMarket().catch(error => console.error('Market Firebase sync failed', error)); } });
 window.addEventListener('journal:local-save', event => { if (!user) return; status('새 일지를 Firebase에 저장하는 중…'); uploadEntry(event.detail).then(() => status('Firebase 저장 완료', 'ok')).catch(error => status(`저장 오류: ${error.message}`, 'error')); });
 window.addEventListener('journal:local-delete', event => deleteRemote(event.detail.id).catch(error => status(`삭제 오류: ${error.message}`, 'error')));
