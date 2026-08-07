@@ -14,3 +14,4 @@ data/crypto_4h_collector.pid
 node_modules/
 data/crypto_4h_api.pid
 crypto_collector/deploy/push.env
+data/crypto_profile.json

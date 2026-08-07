@@ -24,10 +24,12 @@ git merge --ff-only "origin/$BRANCH" --quiet || {
   exit 0
 }
 
-if git diff --quiet -- "${FILES[@]}" && git diff --cached --quiet -- "${FILES[@]}"; then
+# `git diff` alone misses brand-new files (they show up as untracked, not modified),
+# so stage first and diff the index against HEAD -- that catches new files too.
+git add "${FILES[@]}"
+if git diff --cached --quiet -- "${FILES[@]}"; then
   exit 0  # nothing changed since last push, save the API call
 fi
 
-git add "${FILES[@]}"
 git commit -m "crypto: refresh price-bin snapshots $(date -u +%Y-%m-%dT%H:%M:%SZ)" --quiet
 git push "https://${GH_TOKEN}@github.com/khoon77/kospi-strategy-dashboard.git" "HEAD:$BRANCH" --quiet
