@@ -1,0 +1,11 @@
+[Unit]
+Description=Restart collector if every exchange feed has gone silent
+
+[Service]
+# Deliberately root (no User=), unlike the other units: restarting another
+# systemd unit needs privileges a plain user account doesn't have. It only
+# reads the sqlite status table and, in the rare all-feeds-silent case,
+# calls `systemctl restart` -- nothing else.
+Type=oneshot
+WorkingDirectory=/home/%i/kospi-strategy-dashboard
+ExecStart=/home/%i/kospi-strategy-dashboard/.venv/bin/python crypto_collector/deploy/healthcheck.py --service collector@%i.service

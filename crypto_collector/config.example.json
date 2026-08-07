@@ -1,0 +1,22 @@
+{
+  "database": "data/crypto_trades.sqlite3",
+  "export_file": "data/crypto_profile.json",
+  "api_host": "127.0.0.1",
+  "api_port": 8765,
+  "price_bin_usdt": 25,
+  "raw_trade_retention_days": 0,
+  "export_windows_minutes": [15, 30, 60, 240],
+  "venues": [
+    {"name": "Binance", "id": "binance", "market": "spot", "symbol": "BTC/USDT"},
+    {"name": "Binance", "id": "binanceusdm", "market": "swap", "symbol": "BTC/USDT:USDT"},
+    {"name": "Bybit", "id": "bybit", "market": "spot", "symbol": "BTC/USDT", "options": {"defaultType": "spot"}},
+    {"name": "Bybit", "id": "bybit", "market": "swap", "symbol": "BTC/USDT:USDT", "options": {"defaultType": "swap"}},
+    {"name": "Bitget", "id": "bitget", "market": "spot", "symbol": "BTC/USDT", "options": {"defaultType": "spot"}},
+    {"name": "Bitget", "id": "bitget", "market": "swap", "symbol": "BTC/USDT:USDT", "options": {"defaultType": "swap"}},
+    {"name": "OKX", "id": "okx", "market": "spot", "symbol": "BTC/USDT", "options": {"defaultType": "spot"}},
+    {"name": "OKX", "id": "okx", "market": "swap", "symbol": "BTC/USDT:USDT", "options": {"defaultType": "swap"}},
+    {"name": "Gate.io", "id": "gate", "market": "spot", "symbol": "BTC/USDT", "options": {"defaultType": "spot"}},
+    {"name": "Gate.io", "id": "gate", "market": "swap", "symbol": "BTC/USDT:USDT", "options": {"defaultType": "swap"}}
+  ]
+}
+

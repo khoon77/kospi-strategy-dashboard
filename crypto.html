@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>BTC 통합 체결 매물대</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="assets/crypto.css">
+</head>
+<body>
+  <nav class="wrap view-tabs crypto-nav" aria-label="대시보드 메뉴">
+    <a href="index.html">KOSPI 대시보드</a>
+    <a class="active" href="crypto.html">BTC 체결 매물대</a>
+  </nav>
+  <header class="wrap top crypto-top">
+    <div><p class="tag">Aggregated Trade Flow</p><h1>BTC 통합 체결 매물대</h1><p class="muted">Binance 무기한선물 캔들과 5개 주요 거래소의 현물·무기한선물 실제 체결을 가격대별로 합산합니다.</p></div>
+    <div class="fresh"><b id="crypto-badge">데이터 확인 중</b><span id="crypto-fresh">-</span></div>
+  </header>
+  <main class="wrap">
+    <section class="panel crypto-controls" aria-label="매물대 필터">
+      <label>시간봉<select id="crypto-window"><option value="15">15분</option><option value="30">30분</option><option value="60" selected>1시간</option><option value="240">4시간</option></select></label>
+      <label>거래소<select id="crypto-venue"><option value="all">5개 통합</option><option>Binance</option><option>Bybit</option><option>Bitget</option><option>OKX</option><option>Gate.io</option></select></label>
+      <label>시장<select id="crypto-market"><option value="all">현물+선물</option><option value="spot">현물</option><option value="swap">무기한선물</option></select></label>
+      <label>표시 기준<select id="crypto-unit"><option value="quote">거래대금(USDT)</option><option value="base">체결량(BTC)</option></select></label>
+      <button id="crypto-refresh" type="button">새로고침</button>
+    </section>
+    <section class="metrics crypto-metrics">
+      <article><span>분석 구간 체결대금</span><b id="crypto-total">-</b><small id="crypto-count">-</small></article>
+      <article><span>POC · 최대 매물대</span><b id="crypto-poc">-</b><small>실제 체결이 가장 많은 가격구간</small></article>
+      <article><span>체결 Delta</span><b id="crypto-delta">-</b><small id="crypto-ratio">매수-매도</small></article>
+      <article><span>수집 상태</span><b id="crypto-health">-</b><small id="crypto-coverage">연결 확인 중</small></article>
+    </section>
+    <section class="panel">
+      <div class="head"><div><p class="tag">Candles + Volume Profile</p><h2>BTC/USDT 무기한선물과 통합 매물대</h2></div><span class="muted legend"><i class="buy"></i>공격 매수 <i class="sell"></i>공격 매도</span></div>
+      <p class="muted chart-source"><b>캔들:</b> Binance USDT 무기한선물 · <b>매물대:</b> 선택한 거래소·시장 체결 합산 · 마우스 휠 확대/축소, 드래그 이동</p>
+      <div class="market-chart-grid">
+        <div id="candle-chart" class="candle-chart" aria-label="BTC 캔들 차트"></div>
+        <div class="profile-wrap"><canvas id="profile-canvas" aria-label="BTC 가격대별 체결 매물대"></canvas><div id="profile-tooltip" class="chart-tooltip" hidden></div></div>
+      </div>
+      <p class="muted chart-note">POC·VAH·VAL은 선택한 시간 구간의 체결 매물대에서 계산합니다. 매물대는 호가 주문이 아니라 실제 체결 기준이며 25 USDT 단위입니다.</p>
+    </section>
+    <section class="panel">
+      <div class="head"><div><p class="tag">Venue Breakdown</p><h2>거래소·시장별 기여도</h2></div></div>
+      <div class="table"><table><thead><tr><th>거래소</th><th>시장</th><th>매수 체결대금</th><th>매도 체결대금</th><th>Delta</th><th>체결 수</th><th>수집 범위</th></tr></thead><tbody id="crypto-breakdown"><tr><td colspan="7">수집 데이터가 없습니다.</td></tr></tbody></table></div>
+    </section>
+    <section class="panel source-panel">
+      <p class="tag">Data Quality</p><h2>해석 전에 확인할 점</h2>
+      <div id="crypto-status" class="status-grid"></div>
+      <p class="muted">통합값은 거래소 거래대금을 단순 합산하며 임의 가중치를 주지 않습니다. 5개 거래소 모두 USDT BTC 시장만 비교합니다. 서버가 꺼진 시간은 자동 생성되지 않으므로 수집 범위를 반드시 확인하세요.</p>
+    </section>
+  </main>
+  <script src="assets/vendor/lightweight-charts.standalone.production.js"></script>
+  <script src="assets/crypto.js?v=2" defer></script>
+</body>
+</html>

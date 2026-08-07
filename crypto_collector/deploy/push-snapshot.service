@@ -1,0 +1,10 @@
+[Unit]
+Description=Push crypto_profile.json snapshot to GitHub Pages
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=%i
+WorkingDirectory=/home/%i/kospi-strategy-dashboard
+EnvironmentFile=/home/%i/kospi-strategy-dashboard/crypto_collector/deploy/push.env
+ExecStart=/bin/bash /home/%i/kospi-strategy-dashboard/crypto_collector/deploy/push-snapshot.sh

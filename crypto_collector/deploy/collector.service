@@ -1,0 +1,19 @@
+[Unit]
+Description=BTC 5-exchange trade collector (CCXT Pro websockets)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/home/%i/kospi-strategy-dashboard
+ExecStart=/home/%i/kospi-strategy-dashboard/.venv/bin/python crypto_collector/collector.py --config crypto_collector/config.json --log-level INFO
+Restart=always
+RestartSec=5
+# Give the process time to close 10 websockets and flush the final export on stop.
+TimeoutStopSec=20
+# Keep memory/CPU visible in `systemctl status`; harmless caps well above what this workload needs.
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target

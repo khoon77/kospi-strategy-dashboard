@@ -1,3 +1,16 @@
 __pycache__/
 *.pyc
 .env
+crypto_collector/config.json
+data/*.sqlite3
+data/*.sqlite3-shm
+data/*.sqlite3-wal
+data/crypto_4h_profile.json
+data/crypto_4h_report.json
+data/crypto_4h_collector.log
+data/crypto_4h_collector.err.log
+data/crypto_4h_collector.pid
+.venv/
+node_modules/
+data/crypto_4h_api.pid
+crypto_collector/deploy/push.env
