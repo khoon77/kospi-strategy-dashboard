@@ -1,11 +1,13 @@
 {
   "database": "data/crypto_trades.sqlite3",
-  "export_file": "data/crypto_profile.json",
+  "export_detail_file": "data/crypto_bins_recent.json",
+  "export_rollup_file": "data/crypto_bins_hourly.json",
+  "export_status_file": "data/crypto_status.json",
+  "export_detail_hours": 72,
   "api_host": "127.0.0.1",
   "api_port": 8765,
   "price_bin_usdt": 25,
-  "raw_trade_retention_days": 0,
-  "export_windows_minutes": [15, 30, 60, 240],
+  "retention_days": 90,
   "venues": [
     {"name": "Binance", "id": "binance", "market": "spot", "symbol": "BTC/USDT"},
     {"name": "Binance", "id": "binanceusdm", "market": "swap", "symbol": "BTC/USDT:USDT"},

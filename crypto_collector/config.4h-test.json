@@ -1,11 +1,12 @@
 {
   "database": "data/crypto_4h_test.sqlite3",
-  "export_file": "data/crypto_4h_profile.json",
+  "export_detail_file": "data/crypto_4h_bins_recent.json",
+  "export_rollup_file": "data/crypto_4h_bins_hourly.json",
+  "export_detail_hours": 4,
   "api_host": "127.0.0.1",
   "api_port": 8766,
   "price_bin_usdt": 25,
   "retention_days": 1,
-  "export_windows_minutes": [15, 30, 60, 240],
   "venues": [
     {"name": "Binance", "id": "binance", "market": "spot", "symbol": "BTC/USDT"},
     {"name": "Binance", "id": "binanceusdm", "market": "swap", "symbol": "BTC/USDT:USDT"},

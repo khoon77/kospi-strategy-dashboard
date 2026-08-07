@@ -157,6 +157,91 @@ class TradeStore:
         temp.replace(target)
         return payload
 
+    def _bin_header(self) -> tuple[dict, dict, dict]:
+        venues = [r[0] for r in self.db.execute(
+            "SELECT DISTINCT venue FROM trade_bins ORDER BY venue")]
+        markets = [r[0] for r in self.db.execute(
+            "SELECT DISTINCT market FROM trade_bins ORDER BY market")]
+        header = {
+            "schema_version": 1,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "price_bin_usdt": self.price_bin,
+            "venues": venues,
+            "markets": markets,
+            # bin row = [time_ms, venue_idx, market_idx, price_bin, buy_base, sell_base, buy_quote, sell_quote, trade_count]
+        }
+        return header, {v: i for i, v in enumerate(venues)}, {m: i for i, m in enumerate(markets)}
+
+    def export_detail(self, path: str | Path, hours: int = 72) -> None:
+        """1-minute granularity, recent history only -- small enough to ship whole.
+
+        Client-side range aggregation (zoom-following volume profile) uses this for
+        any visible range that falls within the last `hours`; see export_rollup for
+        older history.
+        """
+        cutoff = int(time.time() * 1000) - hours * 3600000
+        with self.lock:
+            header, v_idx, m_idx = self._bin_header()
+            rows = self.db.execute("""
+              SELECT minute, venue, market, price_bin, buy_base, sell_base,
+                     buy_quote, sell_quote, trade_count
+              FROM trade_bins WHERE minute >= ?
+            """, (cutoff,)).fetchall()
+        bins = [
+            [r["minute"], v_idx[r["venue"]], m_idx[r["market"]], r["price_bin"],
+             round(r["buy_base"], 6), round(r["sell_base"], 6),
+             round(r["buy_quote"], 2), round(r["sell_quote"], 2), r["trade_count"]]
+            for r in rows
+        ]
+        self._write_json(path, {**header, "granularity_ms": 60000, "covers_from": cutoff, "bins": bins})
+
+    def export_rollup(self, path: str | Path, days: int = 90) -> None:
+        """1-hour granularity, covers the full retention window.
+
+        Price-bin totals are exact either way -- only the time-bucket width changes,
+        so pre-summing to the hour loses nothing for a volume-at-price histogram. Only
+        matters for slicing a range at sub-hour precision, which export_detail covers
+        for anything recent.
+        """
+        cutoff = int(time.time() * 1000) - days * 86400000
+        with self.lock:
+            header, v_idx, m_idx = self._bin_header()
+            rows = self.db.execute("""
+              SELECT (minute / 3600000) * 3600000 AS hour, venue, market, price_bin,
+                     SUM(buy_base) buy_base, SUM(sell_base) sell_base,
+                     SUM(buy_quote) buy_quote, SUM(sell_quote) sell_quote,
+                     SUM(trade_count) trade_count
+              FROM trade_bins WHERE minute >= ?
+              GROUP BY hour, venue, market, price_bin
+            """, (cutoff,)).fetchall()
+        bins = [
+            [r["hour"], v_idx[r["venue"]], m_idx[r["market"]], r["price_bin"],
+             round(r["buy_base"], 6), round(r["sell_base"], 6),
+             round(r["buy_quote"], 2), round(r["sell_quote"], 2), r["trade_count"]]
+            for r in rows
+        ]
+        self._write_json(path, {**header, "granularity_ms": 3600000, "covers_from": cutoff, "bins": bins})
+
+    def export_status(self, path: str | Path) -> None:
+        """Tiny, cheap file (10 rows) so the dashboard can show feed health without
+        pulling in the much larger bin exports just to check who's stale."""
+        with self.lock:
+            rows = self.db.execute(
+                "SELECT * FROM collector_status ORDER BY venue, market").fetchall()
+        self._write_json(path, {
+            "schema_version": 1,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "status": [dict(row) for row in rows],
+        })
+
+    @staticmethod
+    def _write_json(path: str | Path, payload: dict) -> None:
+        target = Path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temp = target.with_suffix(target.suffix + ".tmp")
+        temp.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        temp.replace(target)
+
     def close(self) -> None:
         with self.lock:
             self.db.close()

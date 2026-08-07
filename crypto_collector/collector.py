@@ -72,11 +72,21 @@ class Collector:
             await exchange.close()
 
     async def export_loop(self) -> None:
-        path = self.config["export_file"]
-        windows = self.config.get("export_windows_minutes", [15, 30, 60, 240])
+        detail_path = self.config.get("export_detail_file", "data/crypto_bins_recent.json")
+        rollup_path = self.config.get("export_rollup_file", "data/crypto_bins_hourly.json")
+        status_path = self.config.get("export_status_file", "data/crypto_status.json")
+        detail_hours = self.config.get("export_detail_hours", 72)
+        retention_days = self.config.get("retention_days", 90)
+        tick = 0
         while self.running:
-            self.store.export(path, windows)
-            self.store.prune(self.config.get("retention_days", 90))
+            self.store.prune(retention_days)
+            self.store.export_detail(detail_path, hours=detail_hours)
+            self.store.export_status(status_path)
+            # Rollup covers the whole retention window and barely changes minute to
+            # minute, so it only needs re-exporting every 5th tick (~5 min).
+            if tick % 5 == 0:
+                self.store.export_rollup(rollup_path, days=retention_days)
+            tick += 1
             await asyncio.sleep(60)
 
     async def run(self) -> None:
@@ -89,7 +99,11 @@ class Collector:
             for task in tasks:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
-            self.store.export(self.config["export_file"], self.config.get("export_windows_minutes", [15, 30, 60, 240]))
+            self.store.export_detail(self.config.get("export_detail_file", "data/crypto_bins_recent.json"),
+                                      hours=self.config.get("export_detail_hours", 72))
+            self.store.export_rollup(self.config.get("export_rollup_file", "data/crypto_bins_hourly.json"),
+                                      days=self.config.get("retention_days", 90))
+            self.store.export_status(self.config.get("export_status_file", "data/crypto_status.json"))
             self.store.close()
 
 
