@@ -31,10 +31,13 @@ class TradeStoreTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             store = TradeStore(Path(folder) / "test.sqlite3", 25)
             now_ms = time.time_ns() // 1_000_000
-            minute = now_ms // 60000 * 60000
-            hour = minute // 3600000 * 3600000
-            # Two trades one minute apart, same price bin -- rollup must sum them
+            hour = now_ms // 3600000 * 3600000
+            # Anchored 5-6 minutes into the current hour rather than at "now" --
+            # two real timestamps one minute apart would occasionally straddle an
+            # hour boundary (flaky ~1/60 runs), landing in two rollup buckets
+            # instead of one. Same price bin either way -- rollup must sum them
             # into a single hourly row even though detail keeps them as two rows.
+            minute = hour + 5 * 60000
             store.add_trade("Binance", "spot", minute, 100012, 1.0, "buy")
             store.add_trade("Binance", "spot", minute + 60000, 100013, 2.0, "buy")
 
