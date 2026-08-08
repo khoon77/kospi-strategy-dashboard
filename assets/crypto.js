@@ -4,7 +4,7 @@ const cryptoCanvas=document.getElementById('profile-canvas'),cryptoTip=document.
 const chartHost=document.getElementById('candle-chart');
 const BINANCE_FAPI='https://fapi.binance.com';
 let chart=null,candleSeries=null,volumeSeries=null,priceLines=[];
-let detailData=null,rollupData=null,statusData=null,profileView=null,rangeReady=false;
+let detailData=null,rollupData=null,statusData=null,profileView=null,rangeReady=false,lastClose=null;
 const money=n=>n==null?'-':new Intl.NumberFormat('ko-KR',{notation:'compact',maximumFractionDigits:2}).format(n)+' USDT';
 const price=n=>n==null?'-':new Intl.NumberFormat('ko-KR',{maximumFractionDigits:0}).format(n);
 const dt=ms=>ms?new Date(ms).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'-';
@@ -51,6 +51,7 @@ async function loadCandles(){
   const candles=rows.map(r=>({time:Math.floor(r[0]/1000),open:+r[1],high:+r[2],low:+r[3],close:+r[4],volume:+r[5]}));
   candleSeries.setData(candles.map(x=>({time:x.time,open:x.open,high:x.high,low:x.low,close:x.close})));
   volumeSeries.setData(candles.map(x=>({time:x.time,value:x.volume,color:x.close>=x.open?'rgba(22,160,112,.35)':'rgba(217,87,87,.35)'})));
+  lastClose=candles.length?candles[candles.length-1].close:null;
   chart.timeScale().fitContent();
 }
 
@@ -115,6 +116,7 @@ function computeProfile(startMs,endMs,venueFilter,marketFilter){
 function refreshProfileView(startMs,endMs){
   if(!rangeReady)return;
   profileView=computeProfile(startMs,endMs,cryptoEls.venue.value,cryptoEls.market.value);
+  profileView.srZones=computeSrZones(profileView);
   renderCrypto();
 }
 
@@ -123,9 +125,46 @@ function valueArea(rows){
   while(total<target&&(lo>0||hi<rows.length-1)){const below=lo>0?rows[lo-1].total_quote:-1,above=hi<rows.length-1?rows[hi+1].total_quote:-1;if(above>=below){hi++;total+=rows[hi].total_quote}else{lo--;total+=rows[lo].total_quote}}
   return{val:rows[lo].price_bin,vah:rows[hi].price_bin};
 }
+
+// Ranks the visible profile's other volume peaks into support/resistance zones,
+// same idea as the auto S/R tools on paid indicators -- except every input number
+// here comes from real trades across 5 exchanges rather than one chart's candle
+// volume split by close-vs-open. POC/VAH/VAL are excluded since those already get
+// their own line; a zone is "resistance" if it sits above the last traded price,
+// "support" if below. minGap keeps two zones from landing on top of each other --
+// it scales with whatever price range is currently visible, so it stays sensible
+// whether you're zoomed into an hour or looking at 50 days.
+function computeSrZones(pv,maxZones=5){
+  // total_quote<=0 filters out zero-volume noise rows (e.g. malformed feed
+  // messages that briefly land on price_bin 0) before anything else runs --
+  // left in, a single stray row like that would blow out the price span below
+  // and make minGap so large it swallows every real candidate along with it.
+  const rows=pv.bins.filter(b=>b.total_quote>0);
+  if(!rows.length)return[];
+  const va=valueArea(rows);
+  const prices=rows.map(b=>b.price_bin);
+  const span=Math.max(...prices)-Math.min(...prices)||100;
+  const minGap=Math.max(span*0.015,25);
+  const excluded=[pv.poc,va.vah,va.val].filter(v=>v!=null);
+  const candidates=rows.filter(b=>!excluded.some(e=>Math.abs(b.price_bin-e)<minGap));
+  const maxTotal=rows.reduce((m,b)=>Math.max(m,b.total_quote),0)||1;
+  const zones=[];
+  for(const b of [...candidates].sort((a,b2)=>b2.total_quote-a.total_quote)){
+    if(zones.length>=maxZones)break;
+    if(zones.some(z=>Math.abs(z.price_bin-b.price_bin)<minGap))continue;
+    zones.push({price_bin:b.price_bin,total_quote:b.total_quote,strength:b.total_quote/maxTotal,
+      role:lastClose==null?'zone':(b.price_bin>lastClose?'resistance':'support')});
+  }
+  return zones.sort((a,b)=>b.price_bin-a.price_bin);
+}
+
 function setLevelLines(){
   priceLines.forEach(x=>candleSeries.removePriceLine(x));priceLines=[];if(!profileView?.bins?.length)return;const va=valueArea(profileView.bins);
   [{price:profileView.poc,title:'POC',color:'#e7a621',width:2},{price:va.vah,title:'VAH',color:'#6d5bd0',width:1},{price:va.val,title:'VAL',color:'#6d5bd0',width:1}].forEach(x=>{if(x.price!=null)priceLines.push(candleSeries.createPriceLine({price:x.price,color:x.color,lineWidth:x.width,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:x.title}))});
+  (profileView.srZones||[]).forEach(z=>{
+    const isRes=z.role==='resistance',label=`${isRes?'R':z.role==='support'?'S':'구간'} ${Math.round(z.strength*100)}%`;
+    priceLines.push(candleSeries.createPriceLine({price:z.price_bin,color:isRes?'rgba(215,101,91,.9)':'rgba(42,157,113,.9)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:true,title:label}));
+  });
 }
 function renderCrypto(){
   const d=profileView;if(!d)return;
@@ -161,14 +200,18 @@ function drawProfileOverlay(){
   const y0=candleSeries.priceToCoordinate(rows[0].price_bin),y1=candleSeries.priceToCoordinate(rows[0].price_bin+binUsdt);
   const binPx=(y0!=null&&y1!=null)?Math.abs(y0-y1):8;
   const barH=Math.max(2,Math.min(28,binPx*0.85));
+  const srPrices=new Set((profileView.srZones||[]).map(z=>z.price_bin));
   rows.forEach(x=>{
     const y=candleSeries.priceToCoordinate(x.price_bin);
     if(y==null||y<-barH||y>g.h+barH)return;
     const buy=unit==='quote'?x.buy_quote:x.buy_base,sell=unit==='quote'?x.sell_quote:x.sell_base;
     const bw=maxBarW*buy/max,sw=maxBarW*sell/max,isPoc=x.price_bin===profileView.poc;
-    ctx.fillStyle=isPoc?'rgba(231,166,33,.55)':'rgba(42,157,113,.42)';
+    // Recognized S/R zones get boosted opacity so they read as bolder bars against
+    // the rest of the profile -- the price-line labels give the exact R/S + strength.
+    const a=isPoc?.55:srPrices.has(x.price_bin)?.68:.42;
+    ctx.fillStyle=isPoc?`rgba(231,166,33,${a})`:`rgba(42,157,113,${a})`;
     ctx.fillRect(0,y-barH/2,bw,barH);
-    ctx.fillStyle=isPoc?'rgba(231,166,33,.75)':'rgba(215,101,91,.42)';
+    ctx.fillStyle=isPoc?`rgba(231,166,33,${a})`:`rgba(215,101,91,${a})`;
     ctx.fillRect(bw,y-barH/2,sw,barH);
   });
 }

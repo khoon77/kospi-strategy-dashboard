@@ -55,9 +55,17 @@ class Collector:
                         if key in seen:
                             continue
                         seen[key] = stamp
+                        # Some feeds (Binance swap in particular) occasionally emit
+                        # trade-shaped messages with price/amount of 0 -- not real
+                        # fills, but they'd otherwise pollute price_bin 0 with fake
+                        # zero-volume rows that show up as a phantom S/R candidate.
+                        price = trade.get("price")
+                        raw_amount = trade.get("amount")
+                        if not price or not raw_amount or price <= 0 or raw_amount <= 0:
+                            continue
                         # CCXT contract trades may report amount in contracts. Normalize every feed to BTC.
-                        base_amount = float(trade["amount"]) * contract_size
-                        self.store.add_trade(venue, market, stamp, trade["price"], base_amount, trade.get("side"))
+                        base_amount = float(raw_amount) * contract_size
+                        self.store.add_trade(venue, market, stamp, price, base_amount, trade.get("side"))
                     cutoff = exchange.milliseconds() - 120000
                     if len(seen) > 10000:
                         seen = {key: stamp for key, stamp in seen.items() if stamp >= cutoff}
