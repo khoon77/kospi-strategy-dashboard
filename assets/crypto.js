@@ -9,7 +9,6 @@ const money=n=>n==null?'-':new Intl.NumberFormat('ko-KR',{notation:'compact',max
 const price=n=>n==null?'-':new Intl.NumberFormat('ko-KR',{maximumFractionDigits:0}).format(n);
 const dt=ms=>ms?new Date(ms).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'-';
 const ago=iso=>{if(!iso)return'-';const m=Math.round((Date.now()-new Date(iso).getTime())/60000);return m<1?'방금 전':m<60?`${m}분 전`:`${(m/60).toFixed(1)}시간 전`};
-const cssVar=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const timeframe=()=>({15:'15m',30:'30m',60:'1h',240:'4h'})[cryptoEls.window.value];
 
 function initChart(){
@@ -27,6 +26,20 @@ function initChart(){
     if(!range)return;
     clearTimeout(debounceId);
     debounceId=setTimeout(()=>refreshProfileView(range.from*1000,range.to*1000),120);
+  });
+  // Overlay tooltip rides the chart's own crosshair instead of independent mouse
+  // listeners, since the overlay canvas has pointer-events:none (it must let clicks
+  // and drags pass through to the chart underneath for zoom/pan to keep working).
+  chart.subscribeCrosshairMove(param=>{
+    if(!param.point||!profileView?.bins?.length){cryptoTip.hidden=true;return}
+    const p=candleSeries.coordinateToPrice(param.point.y);
+    if(p==null){cryptoTip.hidden=true;return}
+    let nearest=profileView.bins[0],best=Infinity;
+    for(const b of profileView.bins){const d=Math.abs(b.price_bin-p);if(d<best){best=d;nearest=b}}
+    cryptoTip.hidden=false;
+    cryptoTip.style.left=`${Math.min(chartHost.clientWidth-210,param.point.x+14)}px`;
+    cryptoTip.style.top=`${Math.max(4,param.point.y-60)}px`;
+    cryptoTip.innerHTML=`<b>${price(nearest.price_bin)} USDT</b><br>매수 ${money(nearest.buy_quote)}<br>매도 ${money(nearest.sell_quote)}<br>Delta ${money(nearest.delta_quote)}`;
   });
 }
 
@@ -122,15 +135,53 @@ function renderCrypto(){
   cryptoEls.health.textContent=`${healthy}/${statusRows.length||10}`;
   cryptoEls.coverage.textContent=`화면 표시 구간: ${dt(d.start_ms)} ~ ${dt(d.end_ms)}`;
   cryptoEls.breakdown.innerHTML=(d.breakdown||[]).length?d.breakdown.map(x=>`<tr><td>${x.venue}</td><td>${x.market==='spot'?'현물':'무기한선물'}</td><td>${money(x.buy_quote)}</td><td>${money(x.sell_quote)}</td><td class="${x.buy_quote-x.sell_quote>=0?'pos':'neg'}">${money(x.buy_quote-x.sell_quote)}</td><td>${new Intl.NumberFormat('ko-KR').format(x.trade_count)}</td></tr>`).join(''):'<tr><td colspan="6">이 구간·필터에 체결 데이터가 없습니다.</td></tr>';
-  cryptoEls.status.innerHTML=statusRows.map(x=>{const stale=now-(x.last_receive_ms||0)>120000;return `<div class="status-item ${stale?'stale':''}"><b>${x.venue} · ${x.market==='spot'?'현물':'선물'}</b><span>${stale?'수신 지연':'정상'} · ${dt(x.last_trade_ms)}</span><span>오류 ${x.errors||0}회</span></div>`}).join('')||'<p class="muted">수집기를 실행하면 피드 상태가 표시됩니다.</p>';drawProfile();setLevelLines();
+  cryptoEls.status.innerHTML=statusRows.map(x=>{const stale=now-(x.last_receive_ms||0)>120000;return `<div class="status-item ${stale?'stale':''}"><b>${x.venue} · ${x.market==='spot'?'현물':'선물'}</b><span>${stale?'수신 지연':'정상'} · ${dt(x.last_trade_ms)}</span><span>오류 ${x.errors||0}회</span></div>`}).join('')||'<p class="muted">수집기를 실행하면 피드 상태가 표시됩니다.</p>';setLevelLines();
 }
-function profileGeom(){const r=cryptoCanvas.getBoundingClientRect(),dpr=devicePixelRatio||1,w=r.width,h=r.height;if(cryptoCanvas.width!==Math.round(w*dpr)||cryptoCanvas.height!==Math.round(h*dpr)){cryptoCanvas.width=Math.round(w*dpr);cryptoCanvas.height=Math.round(h*dpr)}const ctx=cryptoCanvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);return{ctx,w,h,L:66,R:8,T:18,B:34}}
-function drawProfile(){const g=profileGeom(),ctx=g.ctx,rows=profileView?.bins||[],unit=cryptoEls.unit.value;ctx.clearRect(0,0,g.w,g.h);ctx.font='11px system-ui';if(!rows.length){ctx.fillStyle=cssVar('--muted');ctx.fillText('표시할 체결 데이터가 없습니다 (줌/스크롤로 구간을 조정해보세요).',10,g.h/2);return}const max=Math.max(...rows.map(x=>unit==='quote'?x.total_quote:x.buy_base+x.sell_base)),barH=Math.max(3,Math.min(16,(g.h-g.T-g.B)/rows.length*.75)),step=(g.h-g.T-g.B)/rows.length;rows.forEach((x,i)=>{const y=g.h-g.B-(i+.5)*step,buy=unit==='quote'?x.buy_quote:x.buy_base,sell=unit==='quote'?x.sell_quote:x.sell_base,bw=(g.w-g.L-g.R)*buy/max,sw=(g.w-g.L-g.R)*sell/max;ctx.fillStyle='#2a9d71';ctx.fillRect(g.L,y-barH/2,bw,barH);ctx.fillStyle='#d7655b';ctx.fillRect(g.L+bw,y-barH/2,sw,barH);if(i%Math.max(1,Math.ceil(rows.length/14))===0||x.price_bin===profileView.poc){ctx.fillStyle=x.price_bin===profileView.poc?'#e7a621':cssVar('--muted');ctx.fillText(`${price(x.price_bin)}${x.price_bin===profileView.poc?' POC':''}`,4,y+4)}});ctx.fillStyle=cssVar('--muted');ctx.fillText(unit==='quote'?'체결대금 USDT':'체결량 BTC',g.L,g.h-8)}
-cryptoCanvas.addEventListener('mousemove',e=>{if(!profileView?.bins?.length)return;const r=cryptoCanvas.getBoundingClientRect(),g=profileGeom(),i=Math.max(0,Math.min(profileView.bins.length-1,Math.floor((g.h-g.B-(e.clientY-r.top))/((g.h-g.T-g.B)/profileView.bins.length)))),x=profileView.bins[i];cryptoTip.hidden=false;cryptoTip.style.left=`${Math.min(g.w-210,e.clientX-r.left+10)}px`;cryptoTip.style.top=`${Math.max(4,e.clientY-r.top-60)}px`;cryptoTip.innerHTML=`<b>${price(x.price_bin)} USDT</b><br>매수 ${money(x.buy_quote)}<br>매도 ${money(x.sell_quote)}<br>Delta ${money(x.delta_quote)}`});
-cryptoCanvas.addEventListener('mouseleave',()=>cryptoTip.hidden=true);new ResizeObserver(drawProfile).observe(cryptoCanvas);
+
+// Overlay geometry: the canvas is sized to exactly match the candle chart container
+// (see .profile-overlay in crypto.css: position:absolute; inset:0), so a Y pixel
+// coordinate from candleSeries.priceToCoordinate() lands in the right spot directly
+// -- no separate axis or scale math of our own to keep in sync.
+function overlayGeom(){
+  const r=chartHost.getBoundingClientRect(),dpr=devicePixelRatio||1,w=r.width,h=r.height;
+  if(cryptoCanvas.width!==Math.round(w*dpr)||cryptoCanvas.height!==Math.round(h*dpr)){cryptoCanvas.width=Math.round(w*dpr);cryptoCanvas.height=Math.round(h*dpr)}
+  cryptoCanvas.style.width=w+'px';cryptoCanvas.style.height=h+'px';
+  const ctx=cryptoCanvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  return{ctx,w,h};
+}
+function drawProfileOverlay(){
+  const g=overlayGeom(),ctx=g.ctx;ctx.clearRect(0,0,g.w,g.h);
+  const rows=profileView?.bins||[];
+  if(!rows.length||!candleSeries)return;
+  const unit=cryptoEls.unit.value;
+  const max=Math.max(...rows.map(x=>unit==='quote'?x.total_quote:x.buy_base+x.sell_base));
+  if(!max)return;
+  const maxBarW=g.w*0.32;
+  const binUsdt=detailData?.price_bin_usdt||rollupData?.price_bin_usdt||25;
+  const y0=candleSeries.priceToCoordinate(rows[0].price_bin),y1=candleSeries.priceToCoordinate(rows[0].price_bin+binUsdt);
+  const binPx=(y0!=null&&y1!=null)?Math.abs(y0-y1):8;
+  const barH=Math.max(2,Math.min(28,binPx*0.85));
+  rows.forEach(x=>{
+    const y=candleSeries.priceToCoordinate(x.price_bin);
+    if(y==null||y<-barH||y>g.h+barH)return;
+    const buy=unit==='quote'?x.buy_quote:x.buy_base,sell=unit==='quote'?x.sell_quote:x.sell_base;
+    const bw=maxBarW*buy/max,sw=maxBarW*sell/max,isPoc=x.price_bin===profileView.poc;
+    ctx.fillStyle=isPoc?'rgba(231,166,33,.55)':'rgba(42,157,113,.42)';
+    ctx.fillRect(0,y-barH/2,bw,barH);
+    ctx.fillStyle=isPoc?'rgba(231,166,33,.75)':'rgba(215,101,91,.42)';
+    ctx.fillRect(bw,y-barH/2,sw,barH);
+  });
+}
+// Redraws every frame instead of only on data/range changes: priceToCoordinate()
+// output also shifts on vertical autoscale (e.g. panning reveals a new extreme
+// candle) with no dedicated event for that in lightweight-charts, and the redraw
+// itself is cheap (a few dozen fillRect calls), so tracking it via rAF is simpler
+// and more robust than trying to catch every API event that could move the scale.
+(function raf(){drawProfileOverlay();requestAnimationFrame(raf)})();
+
 [cryptoEls.venue,cryptoEls.market].forEach(x=>x.onchange=()=>{const r=chart.timeScale().getVisibleRange();if(r)refreshProfileView(r.from*1000,r.to*1000)});
 cryptoEls.window.onchange=()=>loadCandles().catch(showError);
-cryptoEls.unit.onchange=drawProfile;
+cryptoEls.unit.onchange=()=>{};
 cryptoEls.refresh.onclick=()=>Promise.all([loadCandles(),loadBinData()]).catch(showError);
 function showError(error){cryptoEls.badge.textContent='데이터 없음';cryptoEls.fresh.textContent=error.message}
 initChart();
