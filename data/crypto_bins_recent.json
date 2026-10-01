@@ -1,1 +1,1 @@
-{"schema_version":1,"generated_at":"2026-10-01T00:32:45.268197+00:00","price_bin_usdt":25.0,"venues":["Binance","Bitget","Bybit","Gate.io","OKX"],"markets":["spot","swap"],"granularity_ms":60000,"covers_from":1790555560679,"bins":[]}
+{"schema_version":1,"generated_at":"2026-10-01T00:37:54.905562+00:00","price_bin_usdt":25.0,"venues":["Binance","Bitget","Bybit","Gate.io","OKX"],"markets":["spot","swap"],"granularity_ms":60000,"covers_from":1790555871373,"bins":[]}
